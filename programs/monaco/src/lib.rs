@@ -24,6 +24,7 @@ pub mod monaco {
         liquidity_amount: u64,
         schedule: DcaSchedule,
     ) -> ProgramResult {
+        // Make deposit into solend
         let cpi_accounts = DepositReserveLiquidity {
             source_liquidity: ctx.accounts.source_liquidity.to_account_info().clone(),
             destination_collateral_account: ctx
@@ -52,10 +53,9 @@ pub mod monaco {
         let pda_signer = &[&pda_seeds[..]];
         let cpi_ctx =
             CpiContext::new_with_signer(ctx.accounts.solend.clone(), cpi_accounts, pda_signer);
-
-        // CPI to solend instruction
         deposit_reserve_liquidity(cpi_ctx, liquidity_amount)?;
 
+        // Build deposit state account
         let deposit_state_account = &mut ctx.accounts.deposit;
 
         // Query collateral token account for new balance
@@ -202,7 +202,6 @@ pub mod monaco {
             &reserve_account.key.to_bytes()[..32],
             &[nonce],
         ];
-
         let pda_signer = &[&pda_seeds[..]];
 
         let redeem_cpi_ctx = CpiContext::new_with_signer(
@@ -210,12 +209,7 @@ pub mod monaco {
             redeem_cpi_accounts,
             pda_signer,
         );
-
         redeem_reserve_collateral(redeem_cpi_ctx, amount_to_redeem)?;
-
-        // Find ATA of admin key - fee recipient of the Serum swap step
-        // let admin_ata_key: Pubkey =
-        //     get_associated_token_address(&fee_recipient::ID, &deposit_state.dca_mint);
 
         let (from_token, to_token) = match side {
             Side::Bid => (&ctx.accounts.pc_wallet, &ctx.accounts.market.coin_wallet),
@@ -226,14 +220,12 @@ pub mod monaco {
         let from_amount_before = token::accessor::amount(from_token)?;
         let to_amount_before = token::accessor::amount(to_token)?;
 
-        // Initiate Serum swap
+        // Initiate and settle Serum swap
         let orderbook: OrderbookClient<'info> = (&*ctx.accounts).into();
-
         match side {
             Side::Bid => orderbook.buy(amount_to_redeem, None)?,
             Side::Ask => orderbook.sell(amount_to_redeem, None)?,
         }
-        // Setlle swap
         orderbook.settle(None)?;
 
         // Token balances after the trade.
@@ -259,6 +251,9 @@ pub mod monaco {
                 Side::Ask => token::accessor::mint(to_token)?,
             },
         })?;
+
+        let deposit_account = &mut ctx.accounts.deposit_state;
+        deposit_account.counter += 1;
 
         Ok(())
     }
