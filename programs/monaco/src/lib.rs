@@ -145,6 +145,8 @@ pub mod monaco {
     }
 
     /// Privileged instruction for running DCA strat on a deposit account
+    /// Admin is currently set to fee_receiver::ID
+    #[access_control(validate_admin(&ctx))]
     pub fn run_dca_strategy<'info>(
         ctx: Context<'_, '_, '_, 'info, RunDcaStrategy<'info>>,
         nonce: u8,
@@ -643,21 +645,28 @@ impl<'info> OrderbookClient<'info> {
 
 /// Derive the pubkey of the PDA meant to be in control of the source liquidity token account
 /// and reserve collateral destination account
-pub fn derive_deposit_authority(
-    user: &AccountInfo,
-    reserve: &AccountInfo,
-    program_id: &Pubkey,
-    nonce: u8,
-) -> Result<Pubkey> {
-    Pubkey::create_program_address(
-        &[
-            &user.key.to_bytes()[..32],    // Signer
-            &reserve.key.to_bytes()[..32], // Solend reserve account
-            &[nonce],                      // Nonce - usually 0
-        ],
-        program_id,
-    )
-    .or(Err(ErrorCode::InvalidDerivedAuthority.into()))
+// fn derive_deposit_authority(
+//     user: &AccountInfo,
+//     reserve: &AccountInfo,
+//     program_id: &Pubkey,
+//     nonce: u8,
+// ) -> Result<Pubkey> {
+//     Pubkey::create_program_address(
+//         &[
+//             &user.key.to_bytes()[..32],    // Signer
+//             &reserve.key.to_bytes()[..32], // Solend reserve account
+//             &[nonce],                      // Nonce - usually 0
+//         ],
+//         program_id,
+//     )
+//     .or(Err(ErrorCode::InvalidDerivedAuthority.into()))
+// }
+
+fn validate_admin(ctx: &Context<RunDcaStrategy>) -> ProgramResult {
+    if *ctx.accounts.user_authority.key != fee_recipient::ID {
+        return Err(ErrorCode::InvalidAdmin.into());
+    }
+    Ok(())
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
@@ -709,6 +718,8 @@ pub enum ErrorCode {
     SwapTokensCannotMatch,
     #[msg("Slippage tolerance exceeded")]
     SlippageExceeded,
+    #[msg("Privileged instruction called by incorrect admin")]
+    InvalidAdmin,
 }
 
 // Event emitted when a swap occurs for two base currencies on two different
