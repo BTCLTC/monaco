@@ -8,7 +8,7 @@ use anchor_spl::dex;
 use anchor_spl::dex::serum_dex::instruction::SelfTradeBehavior;
 use anchor_spl::dex::serum_dex::matching::{OrderType, Side as SerumSide};
 use anchor_spl::dex::serum_dex::state::MarketState;
-use anchor_spl::token::{self, transfer, Mint, TokenAccount, Transfer};
+use anchor_spl::token::{self, Mint, TokenAccount};
 use spl_associated_token_account::get_associated_token_address;
 use spl_token_lending::state::Reserve;
 use std::num::NonZeroU64;
@@ -84,7 +84,6 @@ pub mod monaco {
         );
 
         deposit_state_account.created_at = ctx.accounts.clock.unix_timestamp;
-        deposit_state_account.last_update = ctx.accounts.clock.unix_timestamp;
         deposit_state_account.counter = 0;
         deposit_state_account.nonce = nonce;
 
@@ -133,7 +132,6 @@ pub mod monaco {
 
         let deposit_state = &mut ctx.accounts.deposit_state;
         deposit_state.liquidity_amount += liquidity_amount;
-        deposit_state.last_update = ctx.accounts.clock.unix_timestamp;
         // Query collateral token account for new balance
         let collateral_amount = token::accessor::amount(
             &ctx.accounts
@@ -466,17 +464,13 @@ pub struct DepositState {
     pub schedule: DcaSchedule,
     // Pubkey of reserve account of pool where liquidity is deposited
     pub reserve_account: Pubkey,
-
     // Token mint of token to run dca strategy on
     pub dca_mint: Pubkey,
-
     // Set this as ATA of signer
     pub dca_recipient: Pubkey,
 
     // Unix timestamp of deposit
     pub created_at: i64,
-    // Unix timestamp of the last update
-    pub last_update: i64,
     // Integer representing the amount of times a DCA has executed
     pub counter: u16,
     // Nonce
