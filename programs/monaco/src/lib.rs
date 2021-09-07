@@ -132,7 +132,7 @@ pub mod monaco {
                 .to_account_info(),
         )?;
 
-        deposit_state.collateral_amount += collateral_amount;
+        deposit_state.collateral_amount = collateral_amount;
 
         Ok(())
     }
