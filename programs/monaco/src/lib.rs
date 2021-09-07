@@ -308,6 +308,7 @@ pub struct Deposit<'info> {
 #[instruction(nonce: u8, liquidity_amount: u64)]
 pub struct AddToDeposit<'info> {
     // Deposit state being modified
+    // has_one ensures only the creator of the deposit_state account can add to it
     #[account(mut, has_one=user_authority)]
     pub deposit_state: ProgramAccount<'info, DepositState>,
 
@@ -330,6 +331,8 @@ pub struct AddToDeposit<'info> {
     // Make sure account owner is transfer authority PDA
     #[account(
         constraint = destination_collateral_account.owner == *transfer_authority.key,
+        // Destination collateral account should be deterministically derived for consistency - needs to be the same
+        // across all deposits to a deposit state account
         constraint = *destination_collateral_account.to_account_info().key == deposit_state.collateral_account_key
     )]
     pub destination_collateral_account: CpiAccount<'info, TokenAccount>,
