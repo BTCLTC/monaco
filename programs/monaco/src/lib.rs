@@ -61,6 +61,7 @@ pub mod monaco {
         // Query collateral token account for new balance
         let collateral_amount =
             token::accessor::amount(&ctx.accounts.destination_collateral.to_account_info())?;
+        // maybe run an error check for zero collateral token account balance
 
         deposit_state_account.user_authority = *ctx.accounts.user_authority.key;
         deposit_state_account.collateral_account_key =
@@ -69,14 +70,12 @@ pub mod monaco {
         deposit_state_account.collateral_amount = collateral_amount;
         deposit_state_account.schedule = schedule;
         deposit_state_account.reserve_account = *ctx.accounts.reserve.key;
-
         deposit_state_account.dca_mint = *ctx.accounts.dca_mint.to_account_info().key;
-
+        // DCA recipient is just the caller's ATA of the token they want to DCA into
         deposit_state_account.dca_recipient = get_associated_token_address(
             ctx.accounts.user_authority.key,
             ctx.accounts.dca_mint.to_account_info().key,
         );
-
         deposit_state_account.created_at = ctx.accounts.clock.unix_timestamp;
         deposit_state_account.counter = 0;
         deposit_state_account.nonce = nonce;
