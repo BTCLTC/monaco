@@ -29,13 +29,13 @@ pub mod monaco {
             source_liquidity: ctx.accounts.source_liquidity.to_account_info().clone(),
             destination_collateral_account: ctx
                 .accounts
-                .destination_collateral_account
+                .destination_collateral
                 .to_account_info()
                 .clone(),
-            reserve_account: ctx.accounts.reserve_account.clone(),
+            reserve_account: ctx.accounts.reserve.clone(),
             reserve_collateral_mint: ctx.accounts.reserve_collateral_mint.clone(),
             reserve_liquidity_supply: ctx.accounts.reserve_liquidity_supply.clone(),
-            lending_market_account: ctx.accounts.lending_market_account.clone(),
+            lending_market_account: ctx.accounts.lending_market.clone(),
             lending_market_authority: ctx.accounts.lending_market_authority.clone(),
             transfer_authority: ctx.accounts.transfer_authority.clone(),
             clock: ctx.accounts.clock.to_account_info().clone(),
@@ -43,7 +43,7 @@ pub mod monaco {
         };
 
         let user_authority = ctx.accounts.user_authority.clone();
-        let reserve = ctx.accounts.reserve_account.clone();
+        let reserve = ctx.accounts.reserve.clone();
 
         let pda_seeds = &[
             &user_authority.key.to_bytes()[..32],
@@ -59,22 +59,16 @@ pub mod monaco {
         let deposit_state_account = &mut ctx.accounts.deposit;
 
         // Query collateral token account for new balance
-        let collateral_amount = token::accessor::amount(
-            &ctx.accounts
-                .destination_collateral_account
-                .to_account_info(),
-        )?;
+        let collateral_amount =
+            token::accessor::amount(&ctx.accounts.destination_collateral.to_account_info())?;
 
         deposit_state_account.user_authority = *ctx.accounts.user_authority.key;
-        deposit_state_account.collateral_account_key = *ctx
-            .accounts
-            .destination_collateral_account
-            .to_account_info()
-            .key;
+        deposit_state_account.collateral_account_key =
+            *ctx.accounts.destination_collateral.to_account_info().key;
         deposit_state_account.liquidity_amount = liquidity_amount;
         deposit_state_account.collateral_amount = collateral_amount;
         deposit_state_account.schedule = schedule;
-        deposit_state_account.reserve_account = *ctx.accounts.reserve_account.key;
+        deposit_state_account.reserve_account = *ctx.accounts.reserve.key;
 
         deposit_state_account.dca_mint = *ctx.accounts.dca_mint.to_account_info().key;
 
@@ -287,22 +281,22 @@ pub struct Deposit<'info> {
     // Token account for reserve collateral token
     // Make sure it has a 0 balance to ensure empty account and make sure account owner is transfer authority PDA
     #[account(
-        constraint = destination_collateral_account.amount == 0,
-        constraint = destination_collateral_account.owner == *transfer_authority.key,
+        constraint = destination_collateral.amount == 0,
+        constraint = destination_collateral.owner == *transfer_authority.key,
     )]
-    pub destination_collateral_account: CpiAccount<'info, TokenAccount>,
+    pub destination_collateral: CpiAccount<'info, TokenAccount>,
     // Reserve state account
-    pub reserve_account: AccountInfo<'info>,
+    pub reserve: AccountInfo<'info>,
     // Token mint for reserve collateral token
     pub reserve_collateral_mint: AccountInfo<'info>,
     // Reserve liquidity supply SPL token account
     pub reserve_liquidity_supply: AccountInfo<'info>,
     // Lending market account
-    pub lending_market_account: AccountInfo<'info>,
+    pub lending_market: AccountInfo<'info>,
     // Lending market authority (PDA)
     pub lending_market_authority: AccountInfo<'info>,
     // Transfer authority for accounts 1 and 2
-    #[account(seeds = [&user_authority.key.to_bytes()[..32], &reserve_account.key.to_bytes()[..32], &[nonce]])]
+    #[account(seeds = [&user_authority.key.to_bytes()[..32], &reserve.key.to_bytes()[..32], &[nonce]])]
     pub transfer_authority: AccountInfo<'info>,
     // Clock
     pub clock: Sysvar<'info, Clock>,
