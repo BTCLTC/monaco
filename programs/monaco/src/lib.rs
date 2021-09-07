@@ -295,7 +295,7 @@ pub struct Deposit<'info> {
     pub lending_market: AccountInfo<'info>,
     // Lending market authority (PDA)
     pub lending_market_authority: AccountInfo<'info>,
-    // Transfer authority for accounts 1 and 2
+    // Transfer authority for source_liquidity and desitnation_collateral accounts
     #[account(seeds = [&user_authority.key.to_bytes()[..32], &reserve.key.to_bytes()[..32], &[nonce]])]
     pub transfer_authority: AccountInfo<'info>,
     // Clock
