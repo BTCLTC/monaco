@@ -1,15 +1,15 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program_pack::Pack;
 use anchor_solend::cpi::{
-    deposit_reserve_liquidity, redeem_reserve_collateral, refresh_reserve, solend_devnet,
-    DepositReserveLiquidity, RedeemReserveCollateral, RefreshReserve,
+    deposit_reserve_liquidity, redeem_reserve_collateral, solend_devnet, DepositReserveLiquidity,
+    RedeemReserveCollateral,
 };
 use anchor_spl::dex;
 use anchor_spl::dex::serum_dex::instruction::SelfTradeBehavior;
 use anchor_spl::dex::serum_dex::matching::{OrderType, Side as SerumSide};
 use anchor_spl::dex::serum_dex::state::MarketState;
 use anchor_spl::token::{self, Mint, TokenAccount};
-use spl_associated_token_account::get_associated_token_address;
+// use spl_associated_token_account::get_associated_token_address;
 use spl_token_lending::state::Reserve;
 use std::num::NonZeroU64;
 
@@ -23,6 +23,7 @@ pub mod monaco {
         nonce: u8,
         liquidity_amount: u64,
         schedule: DcaSchedule,
+        dca_recipient: Pubkey,
     ) -> ProgramResult {
         // Make deposit into solend
         let cpi_accounts = DepositReserveLiquidity {
@@ -71,14 +72,12 @@ pub mod monaco {
         deposit_state_account.schedule = schedule;
         deposit_state_account.reserve_account = *ctx.accounts.reserve.key;
         deposit_state_account.dca_mint = *ctx.accounts.dca_mint.to_account_info().key;
-        // DCA recipient is just the caller's ATA of the token they want to DCA into
-        deposit_state_account.dca_recipient = get_associated_token_address(
-            ctx.accounts.user_authority.key,
-            ctx.accounts.dca_mint.to_account_info().key,
-        );
+        // dca_recipient should be the caller's ATA of the token they want to DCA into
+        deposit_state_account.dca_recipient = dca_recipient;
         deposit_state_account.created_at = ctx.accounts.clock.unix_timestamp;
         deposit_state_account.counter = 0;
         deposit_state_account.nonce = nonce;
+        deposit_state_account.ooa = None;
 
         Ok(())
     }
@@ -142,22 +141,25 @@ pub mod monaco {
         nonce: u8,
         side: Side,
         min_expected_swap_amount: u64,
+        // ooa is only supplied to set the ooa on deposit_state during first
+        // DCA purchase
+        ooa: Option<Pubkey>,
     ) -> ProgramResult {
         // Refresh reserve account
-        let refresh_cpi_accounts = RefreshReserve {
-            reserve: ctx.accounts.reserve.clone(),
-            pyth_reserve_liquidity_oracle: ctx.accounts.pyth_reserve_liquidity_oracle.clone(),
-            switchboard_reserve_liquidity_oracle: ctx
-                .accounts
-                .switchboard_reserve_liquidity_oracle
-                .clone(),
-            clock: ctx.accounts.clock.clone(),
-        };
-        let refresh_cpi_ctx = CpiContext::new(ctx.accounts.solend.clone(), refresh_cpi_accounts);
-        refresh_reserve(refresh_cpi_ctx)?;
+        // let refresh_cpi_accounts = RefreshReserve {
+        //     reserve: ctx.accounts.reserve.clone(),
+        //     pyth_reserve_liquidity_oracle: ctx.accounts.pyth_reserve_liquidity_oracle.clone(),
+        //     switchboard_reserve_liquidity_oracle: ctx
+        //         .accounts
+        //         .switchboard_reserve_liquidity_oracle
+        //         .clone(),
+        //     clock: ctx.accounts.clock.clone(),
+        // };
+        // let refresh_cpi_ctx = CpiContext::new(ctx.accounts.solend.clone(), refresh_cpi_accounts);
+        // refresh_reserve(refresh_cpi_ctx)?;
 
         // Calculating how much collateral to redeem from reserve
-        let reserve_acct = &mut ctx.accounts.refreshed_reserve_account;
+        let reserve_acct = &mut ctx.accounts.refreshed_reserve;
         let deposit_state = &mut ctx.accounts.deposit_state;
         let reserve: Reserve = Reserve::unpack(&reserve_acct.data.borrow())?;
 
@@ -174,7 +176,7 @@ pub mod monaco {
             source_collateral: ctx.accounts.source_collateral.to_account_info().clone(),
             // This is the account that receives the liquidity, should be controlled by PDA authority
             destination_liquidity: ctx.accounts.destination_liquidity.to_account_info().clone(),
-            refreshed_reserve_account: ctx.accounts.refreshed_reserve_account.clone(),
+            refreshed_reserve_account: ctx.accounts.refreshed_reserve.clone(),
             reserve_collateral_mint: ctx.accounts.reserve_collateral_mint.clone(),
             reserve_liquidity: ctx.accounts.reserve_liquidity.clone(),
             lending_market: ctx.accounts.lending_market.clone(),
@@ -185,7 +187,7 @@ pub mod monaco {
         };
 
         let user_authority = ctx.accounts.user_authority.clone();
-        let reserve_account = ctx.accounts.reserve.clone();
+        let reserve_account = ctx.accounts.refreshed_reserve.clone();
 
         let pda_seeds = &[
             &user_authority.key.to_bytes()[..32],
@@ -244,6 +246,11 @@ pub mod monaco {
 
         let deposit_account = &mut ctx.accounts.deposit_state;
         deposit_account.counter += 1;
+        // This should only be not None on the first DCA, which can be checked client side by
+        // decoding the deposit_state account
+        if ooa != None {
+            deposit_account.ooa = ooa;
+        }
 
         Ok(())
     }
@@ -368,28 +375,37 @@ pub struct RunDcaStrategy<'info> {
     #[account(constraint = solend.key == &solend_devnet::ID)]
     pub solend: AccountInfo<'info>,
 
+    #[account(mut, constraint = *dca_recipient.to_account_info().key == deposit_state.dca_recipient)]
+    pub dca_recipient: CpiAccount<'info, TokenAccount>,
+
     // Solana CPI accounts for RefreshReserve and RedeemReserveCollateral
 
     // Refresh reserve accounts
     // Reserve account
-    pub reserve: AccountInfo<'info>,
-    // Pyth reserve liquidity oracle
-    // Must be the pyth price account specified in InitReserve
-    pub pyth_reserve_liquidity_oracle: AccountInfo<'info>,
-    // Switchboard Reserve liquidity oracle account
-    // Must be the switchboard price account specified in InitReserve
-    pub switchboard_reserve_liquidity_oracle: AccountInfo<'info>,
+    // pub reserve: AccountInfo<'info>,
+    // // Pyth reserve liquidity oracle
+    // // Must be the pyth price account specified in InitReserve
+    // pub pyth_reserve_liquidity_oracle: AccountInfo<'info>,
+    // // Switchboard Reserve liquidity oracle account
+    // // Must be the switchboard price account specified in InitReserve
+    // pub switchboard_reserve_liquidity_oracle: AccountInfo<'info>,
 
     // RedeeemReserveCollateral accounts
     // Source token account for reserve collateral token
     #[account(constraint = source_collateral.to_account_info().key == transfer_authority.key)]
     pub source_collateral: CpiAccount<'info, TokenAccount>,
-    // Destination liquidity token account
+    // Destination liquidity token account - this is either the base or quote account
     #[account(mut)]
     pub destination_liquidity: CpiAccount<'info, TokenAccount>,
+    // Serum recipient token account - this is either the base or quote account
+    #[account(
+        mut,
+        constraint = *serum_recipient.to_account_info().key == deposit_state.dca_recipient
+    )]
+    pub serum_recipient: CpiAccount<'info, TokenAccount>,
     // Refreshed reserve account
-    #[account(constraint = refreshed_reserve_account.key == reserve.key)]
-    pub refreshed_reserve_account: AccountInfo<'info>,
+    // #[account(constraint = refreshed_reserve.key == reserve.key)]
+    pub refreshed_reserve: AccountInfo<'info>,
     // Reserve collateral mint account
     pub reserve_collateral_mint: AccountInfo<'info>,
     // Reserve liquidity supply SPL Token account.
@@ -399,7 +415,7 @@ pub struct RunDcaStrategy<'info> {
     // Lending market authority - PDA
     pub lending_market_authority: AccountInfo<'info>,
     // User transfer authority
-    #[account(seeds = [&user_authority.key.to_bytes()[..32], &refreshed_reserve_account.key.to_bytes()[..32], &[nonce]])]
+    #[account(seeds = [&user_authority.key.to_bytes()[..32], &refreshed_reserve.key.to_bytes()[..32], &[nonce]])]
     pub transfer_authority: AccountInfo<'info>,
 
     // Serum swap accounts
@@ -463,7 +479,8 @@ pub struct DepositState {
     pub dca_mint: Pubkey,
     // Set this as ATA of signer
     pub dca_recipient: Pubkey,
-
+    // OOA Pubkey
+    pub ooa: Option<Pubkey>,
     // Unix timestamp of deposit
     pub created_at: i64,
     // Integer representing the amount of times a DCA has executed
@@ -478,6 +495,7 @@ pub struct DepositState {
 pub struct MarketAccounts<'info> {
     #[account(mut)]
     market: AccountInfo<'info>,
+    // User supplied OOA
     #[account(mut)]
     open_orders: AccountInfo<'info>,
     #[account(mut)]
