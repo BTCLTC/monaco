@@ -9,7 +9,6 @@ use anchor_spl::dex::serum_dex::instruction::SelfTradeBehavior;
 use anchor_spl::dex::serum_dex::matching::{OrderType, Side as SerumSide};
 use anchor_spl::dex::serum_dex::state::MarketState;
 use anchor_spl::token::{self, Mint, TokenAccount};
-// use spl_associated_token_account::get_associated_token_address;
 use spl_token_lending::state::Reserve;
 use std::num::NonZeroU64;
 
@@ -175,7 +174,12 @@ pub mod monaco {
         let redeem_cpi_accounts = RedeemReserveCollateral {
             source_collateral: ctx.accounts.source_collateral.to_account_info().clone(),
             // This is the account that receives the liquidity, should be controlled by PDA authority
-            destination_liquidity: ctx.accounts.destination_liquidity.to_account_info().clone(),
+            destination_liquidity: ctx
+                .accounts
+                .market
+                .destination_liquidity
+                .to_account_info()
+                .clone(),
             refreshed_reserve_account: ctx.accounts.refreshed_reserve.clone(),
             reserve_collateral_mint: ctx.accounts.reserve_collateral_mint.clone(),
             reserve_liquidity: ctx.accounts.reserve_liquidity.clone(),
@@ -204,13 +208,19 @@ pub mod monaco {
         redeem_reserve_collateral(redeem_cpi_ctx, amount_to_redeem)?;
 
         let (from_token, to_token) = match side {
-            Side::Bid => (&ctx.accounts.pc_wallet, &ctx.accounts.market.coin_wallet),
-            Side::Ask => (&ctx.accounts.market.coin_wallet, &ctx.accounts.pc_wallet),
+            Side::Bid => (
+                ctx.accounts.dca_recipient.to_account_info(),
+                ctx.accounts.market.destination_liquidity.to_account_info(),
+            ),
+            Side::Ask => (
+                ctx.accounts.market.destination_liquidity.to_account_info(),
+                ctx.accounts.dca_recipient.to_account_info(),
+            ),
         };
 
         // Token balances before the trade.
-        let from_amount_before = token::accessor::amount(from_token)?;
-        let to_amount_before = token::accessor::amount(to_token)?;
+        let from_amount_before = token::accessor::amount(&from_token)?;
+        let to_amount_before = token::accessor::amount(&to_token)?;
 
         // Initiate and settle Serum swap
         let orderbook: OrderbookClient<'info> = (&*ctx.accounts).into();
@@ -218,11 +228,11 @@ pub mod monaco {
             Side::Bid => orderbook.buy(amount_to_redeem, None)?,
             Side::Ask => orderbook.sell(amount_to_redeem, None)?,
         }
-        orderbook.settle(None)?;
+        orderbook.settle(None, &ctx.accounts.dca_recipient)?;
 
         // Token balances after the trade.
-        let from_amount_after = token::accessor::amount(from_token)?;
-        let to_amount_after = token::accessor::amount(to_token)?;
+        let from_amount_after = token::accessor::amount(&from_token)?;
+        let to_amount_after = token::accessor::amount(&to_token)?;
 
         //  Calculate the delta, i.e. the amount swapped.
         let from_amount = from_amount_before.checked_sub(from_amount_after).unwrap();
@@ -236,11 +246,11 @@ pub mod monaco {
             from_amount,
             to_amount,
             spill_amount: 0,
-            from_mint: token::accessor::mint(from_token)?,
-            to_mint: token::accessor::mint(to_token)?,
+            from_mint: token::accessor::mint(&from_token)?,
+            to_mint: token::accessor::mint(&to_token)?,
             quote_mint: match side {
-                Side::Bid => token::accessor::mint(from_token)?,
-                Side::Ask => token::accessor::mint(to_token)?,
+                Side::Bid => token::accessor::mint(&from_token)?,
+                Side::Ask => token::accessor::mint(&to_token)?,
             },
         })?;
 
@@ -375,9 +385,6 @@ pub struct RunDcaStrategy<'info> {
     #[account(constraint = solend.key == &solend_devnet::ID)]
     pub solend: AccountInfo<'info>,
 
-    #[account(mut, constraint = *dca_recipient.to_account_info().key == deposit_state.dca_recipient)]
-    pub dca_recipient: CpiAccount<'info, TokenAccount>,
-
     // Solana CPI accounts for RefreshReserve and RedeemReserveCollateral
 
     // Refresh reserve accounts
@@ -394,10 +401,6 @@ pub struct RunDcaStrategy<'info> {
     // Source token account for reserve collateral token
     #[account(constraint = source_collateral.to_account_info().key == transfer_authority.key)]
     pub source_collateral: CpiAccount<'info, TokenAccount>,
-    // Destination liquidity token account - this is either the base or quote account
-    #[account(mut)]
-    pub destination_liquidity: CpiAccount<'info, TokenAccount>,
-    // Serum recipient token account - this is either the base or quote account
     #[account(
         mut,
         constraint = *serum_recipient.to_account_info().key == deposit_state.dca_recipient
@@ -420,9 +423,9 @@ pub struct RunDcaStrategy<'info> {
 
     // Serum swap accounts
     market: MarketAccounts<'info>,
-    // Should technically be able to use destination_liquidity account in place of this
+    // DELET DIS
     #[account(mut)]
-    pc_wallet: AccountInfo<'info>,
+    dca_recipient: CpiAccount<'info, TokenAccount>,
     // Programs.
     dex_program: AccountInfo<'info>,
 
@@ -437,7 +440,7 @@ impl<'info> From<&RunDcaStrategy<'info>> for OrderbookClient<'info> {
         OrderbookClient {
             market: accounts.market.clone(),
             authority: accounts.transfer_authority.clone(),
-            pc_wallet: accounts.pc_wallet.clone(),
+            pc_wallet: accounts.dca_recipient.to_account_info().clone(),
             dex_program: accounts.dex_program.clone(),
             token_program: accounts.token_program_id.clone(),
             rent: accounts.rent.clone(),
@@ -481,6 +484,7 @@ pub struct DepositState {
     pub dca_recipient: Pubkey,
     // OOA Pubkey
     pub ooa: Option<Pubkey>,
+
     // Unix timestamp of deposit
     pub created_at: i64,
     // Integer representing the amount of times a DCA has executed
@@ -524,7 +528,7 @@ pub struct MarketAccounts<'info> {
     vault_signer: AccountInfo<'info>,
     // User wallets.
     #[account(mut)]
-    coin_wallet: AccountInfo<'info>,
+    destination_liquidity: CpiAccount<'info, TokenAccount>,
 }
 
 // Client for sending orders to the Serum DEX.
@@ -632,15 +636,19 @@ impl<'info> OrderbookClient<'info> {
         )
     }
 
-    fn settle(&self, referral: Option<AccountInfo<'info>>) -> ProgramResult {
+    fn settle(
+        &self,
+        referral: Option<AccountInfo<'info>>,
+        quote_wallet: &CpiAccount<'info, TokenAccount>,
+    ) -> ProgramResult {
         let settle_accs = dex::SettleFunds {
             market: self.market.market.clone(),
             open_orders: self.market.open_orders.clone(),
             open_orders_authority: self.authority.clone(),
             coin_vault: self.market.coin_vault.clone(),
             pc_vault: self.market.pc_vault.clone(),
-            coin_wallet: self.market.coin_wallet.clone(),
-            pc_wallet: self.pc_wallet.clone(),
+            coin_wallet: self.market.destination_liquidity.to_account_info().clone(),
+            pc_wallet: quote_wallet.to_account_info().clone(),
             vault_signer: self.market.vault_signer.clone(),
             token_program: self.token_program.clone(),
         };
