@@ -845,5 +845,3 @@ pub struct DidSwap {
 pub mod fee_recipient {
     solana_program::declare_id!("rohanrAYfWTd7DtNHVtoJFxdLYspwToEr55BqFdfkZd");
 }
-
-pub mod usdc_pubkey {}
