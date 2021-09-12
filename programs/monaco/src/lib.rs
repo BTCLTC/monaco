@@ -269,8 +269,6 @@ pub mod monaco {
         let reserve_collateral = &mut ctx.accounts.source_collateral;
         let collateral_amount = token::accessor::amount(&reserve_collateral.to_account_info())?;
 
-        let liquidity_recipient = &mut ctx.accounts.liquidity_recipient;
-
         let redeem_cpi_accounts = RedeemReserveCollateral {
             source_collateral: ctx.accounts.source_collateral.to_account_info().clone(),
             // This is the account that receives the liquidity, should be controlled by PDA authority
