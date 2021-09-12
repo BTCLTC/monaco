@@ -12,6 +12,9 @@ use anchor_spl::token::{self, Mint, TokenAccount};
 use spl_token_lending::state::Reserve;
 use std::num::NonZeroU64;
 
+// TODO: CHECK BASE LOGIC FOR CONTRACT AND ADD LOGIC FOR FEE EXTRACTION
+// ON EACH DCA
+
 #[program]
 pub mod monaco {
     use super::*;
