@@ -264,6 +264,46 @@ pub mod monaco {
 
         Ok(())
     }
+
+    pub fn close_account(ctx: Context<CloseAccount>, nonce: u8) -> ProgramResult {
+        let reserve_collateral = &mut ctx.accounts.source_collateral;
+        let collateral_amount = token::accessor::amount(&reserve_collateral.to_account_info())?;
+
+        let liquidity_recipient = &mut ctx.accounts.liquidity_recipient;
+
+        let redeem_cpi_accounts = RedeemReserveCollateral {
+            source_collateral: ctx.accounts.source_collateral.to_account_info().clone(),
+            // This is the account that receives the liquidity, should be controlled by PDA authority
+            destination_liquidity: ctx.accounts.liquidity_recipient.to_account_info().clone(),
+            refreshed_reserve_account: ctx.accounts.refreshed_reserve.clone(),
+            reserve_collateral_mint: ctx.accounts.reserve_collateral_mint.clone(),
+            reserve_liquidity: ctx.accounts.reserve_liquidity.clone(),
+            lending_market: ctx.accounts.lending_market.clone(),
+            lending_market_authority: ctx.accounts.lending_market_authority.clone(),
+            user_transfer_authority: ctx.accounts.transfer_authority.clone(),
+            clock: ctx.accounts.clock.clone(),
+            token_program_id: ctx.accounts.token_program_id.clone(),
+        };
+
+        let user_authority = ctx.accounts.user_authority.clone();
+        let reserve_account = ctx.accounts.refreshed_reserve.clone();
+
+        let pda_seeds = &[
+            &user_authority.key.to_bytes()[..32],
+            &reserve_account.key.to_bytes()[..32],
+            &[nonce],
+        ];
+        let pda_signer = &[&pda_seeds[..]];
+
+        let redeem_cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.solend.clone(),
+            redeem_cpi_accounts,
+            pda_signer,
+        );
+        redeem_reserve_collateral(redeem_cpi_ctx, collateral_amount)?;
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -440,7 +480,7 @@ impl<'info> From<&RunDcaStrategy<'info>> for OrderbookClient<'info> {
         OrderbookClient {
             market: accounts.market.clone(),
             authority: accounts.transfer_authority.clone(),
-            pc_wallet: accounts.dca_recipient.to_account_info().clone(),
+            // pc_wallet: accounts.dca_recipient.to_account_info().clone(),
             dex_program: accounts.dex_program.clone(),
             token_program: accounts.token_program_id.clone(),
             rent: accounts.rent.clone(),
@@ -449,6 +489,7 @@ impl<'info> From<&RunDcaStrategy<'info>> for OrderbookClient<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(nonce: u8)]
 pub struct CloseAccount<'info> {
     #[account(
         mut,
@@ -459,6 +500,40 @@ pub struct CloseAccount<'info> {
 
     #[account(signer)]
     pub user_authority: AccountInfo<'info>,
+
+    pub liquidity_recipient: CpiAccount<'info, TokenAccount>,
+
+    // Solend program
+    #[account(constraint = solend.key == &solend_devnet::ID)]
+    pub solend: AccountInfo<'info>,
+
+    // RedeeemReserveCollateral accounts
+    // Source token account for reserve collateral token
+    #[account(constraint = source_collateral.to_account_info().key == transfer_authority.key)]
+    pub source_collateral: CpiAccount<'info, TokenAccount>,
+    #[account(
+        mut,
+        constraint = *serum_recipient.to_account_info().key == deposit_state.dca_recipient
+    )]
+    pub serum_recipient: CpiAccount<'info, TokenAccount>,
+    // Refreshed reserve account
+    // #[account(constraint = refreshed_reserve.key == reserve.key)]
+    pub refreshed_reserve: AccountInfo<'info>,
+    // Reserve collateral mint account
+    pub reserve_collateral_mint: AccountInfo<'info>,
+    // Reserve liquidity supply SPL Token account.
+    pub reserve_liquidity: AccountInfo<'info>,
+    // Lending market account
+    pub lending_market: AccountInfo<'info>,
+    // Lending market authority - PDA
+    pub lending_market_authority: AccountInfo<'info>,
+    // User transfer authority
+    #[account(seeds = [&user_authority.key.to_bytes()[..32], &refreshed_reserve.key.to_bytes()[..32], &[nonce]])]
+    pub transfer_authority: AccountInfo<'info>,
+
+    pub clock: AccountInfo<'info>,
+    pub rent: AccountInfo<'info>,
+    pub token_program_id: AccountInfo<'info>,
 }
 
 #[account]
@@ -535,7 +610,7 @@ pub struct MarketAccounts<'info> {
 struct OrderbookClient<'info> {
     market: MarketAccounts<'info>,
     authority: AccountInfo<'info>,
-    pc_wallet: AccountInfo<'info>,
+    // pc_wallet: AccountInfo<'info>,
     dex_program: AccountInfo<'info>,
     token_program: AccountInfo<'info>,
     rent: AccountInfo<'info>,
@@ -739,6 +814,8 @@ pub enum ErrorCode {
     SlippageExceeded,
     #[msg("Privileged instruction called by incorrect admin")]
     InvalidAdmin,
+    #[msg("Collateral account is already empty")]
+    CollateralAccountIsEmpty,
 }
 
 // Event emitted when a swap occurs for two base currencies on two different
