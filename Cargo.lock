@@ -150,9 +150,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "anchor-solend"
-version = "0.1.0"
-source = "git+https://github.com/RohanKapurDEV/anchor-solend#55f329caff9e5e12d008454d33a7335d8f0819c5"
+name = "anchor-lending"
+version = "0.2.0"
+source = "git+https://github.com/RohanKapurDEV/anchor-lending#cf56b09961a60514ff7d6ef9674f2358e9046982"
 dependencies = [
  "anchor-lang",
  "solana-program",
@@ -707,7 +707,7 @@ name = "monaco"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
- "anchor-solend",
+ "anchor-lending",
  "anchor-spl",
  "solana-program",
  "spl-associated-token-account",

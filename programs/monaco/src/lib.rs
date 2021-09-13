@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program_pack::Pack;
-use anchor_solend::cpi::{
-    deposit_reserve_liquidity, redeem_reserve_collateral, solend_devnet, DepositReserveLiquidity,
+use anchor_lending::cpi::{
+    deposit_reserve_liquidity, redeem_reserve_collateral, DepositReserveLiquidity,
     RedeemReserveCollateral,
 };
 use anchor_spl::dex;
@@ -11,9 +11,6 @@ use anchor_spl::dex::serum_dex::state::MarketState;
 use anchor_spl::token::{self, Mint, TokenAccount};
 use spl_token_lending::state::Reserve;
 use std::num::NonZeroU64;
-
-// TODO: CHECK BASE LOGIC FOR CONTRACT AND ADD LOGIC FOR FEE EXTRACTION
-// ON EACH DCA
 
 #[program]
 pub mod monaco {
@@ -29,6 +26,7 @@ pub mod monaco {
     ) -> ProgramResult {
         // Make deposit into lending program
         let cpi_accounts = DepositReserveLiquidity {
+            lending_program: ctx.accounts.lending_program.clone(),
             source_liquidity: ctx.accounts.source_liquidity.to_account_info().clone(),
             destination_collateral_account: ctx
                 .accounts
@@ -95,6 +93,7 @@ pub mod monaco {
         liquidity_amount: u64,
     ) -> ProgramResult {
         let cpi_accounts = DepositReserveLiquidity {
+            lending_program: ctx.accounts.lending_program.clone(),
             source_liquidity: ctx.accounts.source_liquidity.to_account_info().clone(),
             destination_collateral_account: ctx
                 .accounts
@@ -181,6 +180,7 @@ pub mod monaco {
 
         // Redeem reserve collateral
         let redeem_cpi_accounts = RedeemReserveCollateral {
+            lending_program: ctx.accounts.lending_program.clone(),
             source_collateral: ctx.accounts.source_collateral.to_account_info().clone(),
             // This is the account that receives the liquidity, should be controlled by PDA authority
             destination_liquidity: ctx
@@ -279,6 +279,7 @@ pub mod monaco {
         let collateral_amount = token::accessor::amount(&reserve_collateral.to_account_info())?;
 
         let redeem_cpi_accounts = RedeemReserveCollateral {
+            lending_program: ctx.accounts.lending_program.clone(),
             source_collateral: ctx.accounts.source_collateral.to_account_info().clone(),
             // This is the account that receives the liquidity, should be controlled by PDA authority
             destination_liquidity: ctx.accounts.liquidity_recipient.to_account_info().clone(),
