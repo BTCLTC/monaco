@@ -2,6 +2,8 @@
 
 Monaco is a DCA protocol for solana built on top of Serum and compatible with any program that implements or extends the instruction interface from the standard spl token-lending program.
 
+![alt-text](https://i.imgur.com/bN6r9js.png)
+
 ## What is it comprised of?
 
 The protocol itself is made up of 4 parts:
