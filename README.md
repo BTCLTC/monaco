@@ -25,7 +25,7 @@ No. As of the time I'm writing this, I have only finished the initial smart cont
 
 ## Will this be supported after the hackathon is over?
 
-Yes, v1 will simply be DCA via lending protocols and anchor. v2 will be off-the-walls crazy.
+Yes, v1 will simply be DCA via lending protocols and Serum. v2 will be off-the-walls crazy.
 
 ## Will there be a token?
 
