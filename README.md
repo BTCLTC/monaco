@@ -13,7 +13,7 @@ The protocol itself is made up of 4 parts:
 
 ## How does it work?
 
-Monaco is simple. It takes in deposits and uses them to provide liquidity on whichever lending protocol is chosen. On the specified intervals, it will extract _ONLY_ the profits made on the liqudiiy deposit and use it to fund a purchase of a specified token on Serum.
+Monaco is simple. It takes in deposits and uses them to provide liquidity on whichever lending protocol is chosen. On the specified intervals, it will extract _ONLY_ the profits made on the liqudiiy deposit and uses it to fund a purchase of a specified token on Serum.
 
 The idea here is for there to be a seamless way to stack up on the tokens you want to build up a position in over time but without having to supply more money again and again.
 
