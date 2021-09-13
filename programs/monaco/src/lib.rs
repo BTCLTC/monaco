@@ -27,7 +27,7 @@ pub mod monaco {
         schedule: DcaSchedule,
         dca_recipient: Pubkey,
     ) -> ProgramResult {
-        // Make deposit into solend
+        // Make deposit into lending program
         let cpi_accounts = DepositReserveLiquidity {
             source_liquidity: ctx.accounts.source_liquidity.to_account_info().clone(),
             destination_collateral_account: ctx
@@ -54,8 +54,11 @@ pub mod monaco {
             &[nonce],
         ];
         let pda_signer = &[&pda_seeds[..]];
-        let cpi_ctx =
-            CpiContext::new_with_signer(ctx.accounts.solend.clone(), cpi_accounts, pda_signer);
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.lending_program.clone(),
+            cpi_accounts,
+            pda_signer,
+        );
         deposit_reserve_liquidity(cpi_ctx, liquidity_amount)?;
 
         // Build deposit state account
@@ -118,10 +121,13 @@ pub mod monaco {
         ];
         let pda_signer = &[&pda_seeds[..]];
 
-        let cpi_ctx =
-            CpiContext::new_with_signer(ctx.accounts.solend.clone(), cpi_accounts, pda_signer);
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.lending_program.clone(),
+            cpi_accounts,
+            pda_signer,
+        );
 
-        // CPI to solend instruction
+        // CPI to lending program instruction
         deposit_reserve_liquidity(cpi_ctx, liquidity_amount)?;
 
         let deposit_state = &mut ctx.accounts.deposit_state;
@@ -204,7 +210,7 @@ pub mod monaco {
         let pda_signer = &[&pda_seeds[..]];
 
         let redeem_cpi_ctx = CpiContext::new_with_signer(
-            ctx.accounts.solend.clone(),
+            ctx.accounts.lending_program.clone(),
             redeem_cpi_accounts,
             pda_signer,
         );
@@ -297,7 +303,7 @@ pub mod monaco {
         let pda_signer = &[&pda_seeds[..]];
 
         let redeem_cpi_ctx = CpiContext::new_with_signer(
-            ctx.accounts.solend.clone(),
+            ctx.accounts.lending_program.clone(),
             redeem_cpi_accounts,
             pda_signer,
         );
@@ -318,9 +324,8 @@ pub struct Deposit<'info> {
     #[account(signer)]
     pub user_authority: AccountInfo<'info>,
 
-    // Solend program
-    #[account(constraint = solend.key == &solend_devnet::ID)]
-    pub solend: AccountInfo<'info>,
+    // Solend, Jet, or Port program
+    pub lending_program: AccountInfo<'info>,
 
     // Token mint of DCA receiving asset
     pub dca_mint: CpiAccount<'info, Mint>,
@@ -371,9 +376,8 @@ pub struct AddToDeposit<'info> {
     #[account(signer)]
     pub user_authority: AccountInfo<'info>,
 
-    // Solend program
-    #[account(constraint = solend.key == &solend_devnet::ID)]
-    pub solend: AccountInfo<'info>,
+    // Solend, Jet, or Port program
+    pub lending_program: AccountInfo<'info>,
 
     // Solend CPI accounts
     // Token account for asset to deposit into reserve and make sure account owner is transfer authority PDA
@@ -422,9 +426,8 @@ pub struct RunDcaStrategy<'info> {
     #[account(signer)]
     pub user_authority: AccountInfo<'info>,
 
-    // Solend program
-    #[account(constraint = solend.key == &solend_devnet::ID)]
-    pub solend: AccountInfo<'info>,
+    // Solend, Jet, or Port program
+    pub lending_program: AccountInfo<'info>,
 
     // Solana CPI accounts for RefreshReserve and RedeemReserveCollateral
 
@@ -504,9 +507,8 @@ pub struct CloseAccount<'info> {
 
     pub liquidity_recipient: CpiAccount<'info, TokenAccount>,
 
-    // Solend program
-    #[account(constraint = solend.key == &solend_devnet::ID)]
-    pub solend: AccountInfo<'info>,
+    // Solend, Jet, or Port program
+    pub lending_program: AccountInfo<'info>,
 
     // RedeeemReserveCollateral accounts
     // Source token account for reserve collateral token

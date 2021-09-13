@@ -152,7 +152,7 @@ dependencies = [
 [[package]]
 name = "anchor-solend"
 version = "0.1.0"
-source = "git+https://github.com/RohanKapurDEV/anchor-solend#9148463c2c5f64e982abe81e5a466d313398fe2e"
+source = "git+https://github.com/RohanKapurDEV/anchor-solend#55f329caff9e5e12d008454d33a7335d8f0819c5"
 dependencies = [
  "anchor-lang",
  "solana-program",
