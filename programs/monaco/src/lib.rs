@@ -18,74 +18,74 @@ declare_id!("BuYep31Y9ahB7qYPnTXY8zPVr4m341WPknmKj7RjGnaD");
 pub mod monaco {
     use super::*;
 
-    // /// Deposits funds into solend reserve first, then makes corresponding DepositState account
-    // pub fn deposit(
-    //     ctx: Context<Deposit>,
-    //     nonce: u8,
-    //     liquidity_amount: u64,
-    //     schedule: DcaSchedule,
-    //     dca_recipient: Pubkey,
-    // ) -> ProgramResult {
-    //     // Make deposit into lending program
-    //     let cpi_accounts = DepositReserveLiquidity {
-    //         lending_program: ctx.accounts.lending_program.clone(),
-    //         source_liquidity: ctx.accounts.source_liquidity.to_account_info().clone(),
-    //         destination_collateral_account: ctx
-    //             .accounts
-    //             .destination_collateral
-    //             .to_account_info()
-    //             .clone(),
-    //         reserve_account: ctx.accounts.reserve.clone(),
-    //         reserve_collateral_mint: ctx.accounts.reserve_collateral_mint.clone(),
-    //         reserve_liquidity_supply: ctx.accounts.reserve_liquidity_supply.clone(),
-    //         lending_market_account: ctx.accounts.lending_market.clone(),
-    //         lending_market_authority: ctx.accounts.lending_market_authority.clone(),
-    //         transfer_authority: ctx.accounts.transfer_authority.clone(),
-    //         clock: ctx.accounts.clock.to_account_info().clone(),
-    //         token_program_id: ctx.accounts.token_program.clone(),
-    //     };
+    /// Deposits funds into solend reserve first, then makes corresponding DepositState account
+    pub fn deposit(
+        ctx: Context<Deposit>,
+        nonce: u8,
+        liquidity_amount: u64,
+        schedule: DcaSchedule,
+        dca_recipient: Pubkey,
+    ) -> ProgramResult {
+        // Make deposit into lending program
+        let cpi_accounts = DepositReserveLiquidity {
+            lending_program: ctx.accounts.lending_program.clone(),
+            source_liquidity: ctx.accounts.source_liquidity.to_account_info().clone(),
+            destination_collateral_account: ctx
+                .accounts
+                .destination_collateral
+                .to_account_info()
+                .clone(),
+            reserve_account: ctx.accounts.reserve.clone(),
+            reserve_collateral_mint: ctx.accounts.reserve_collateral_mint.clone(),
+            reserve_liquidity_supply: ctx.accounts.reserve_liquidity_supply.clone(),
+            lending_market_account: ctx.accounts.lending_market.clone(),
+            lending_market_authority: ctx.accounts.lending_market_authority.clone(),
+            transfer_authority: ctx.accounts.transfer_authority.clone(),
+            clock: ctx.accounts.clock.to_account_info().clone(),
+            token_program_id: ctx.accounts.token_program.clone(),
+        };
 
-    //     let user_authority = ctx.accounts.user_authority.clone();
-    //     let reserve = ctx.accounts.reserve.clone();
+        let user_authority = ctx.accounts.user_authority.clone();
+        let reserve = ctx.accounts.reserve.clone();
 
-    //     let pda_seeds = &[
-    //         &user_authority.key.to_bytes()[..32],
-    //         &reserve.key.to_bytes()[..32],
-    //         &[nonce],
-    //     ];
-    //     let pda_signer = &[&pda_seeds[..]];
-    //     let cpi_ctx = CpiContext::new_with_signer(
-    //         ctx.accounts.lending_program.clone(),
-    //         cpi_accounts,
-    //         pda_signer,
-    //     );
-    //     deposit_reserve_liquidity(cpi_ctx, liquidity_amount)?;
+        let pda_seeds = &[
+            &user_authority.key.to_bytes()[..32],
+            &reserve.key.to_bytes()[..32],
+            &[nonce],
+        ];
+        let pda_signer = &[&pda_seeds[..]];
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.lending_program.clone(),
+            cpi_accounts,
+            pda_signer,
+        );
+        deposit_reserve_liquidity(cpi_ctx, liquidity_amount)?;
 
-    //     // Build deposit state account
-    //     let deposit_state_account = &mut ctx.accounts.deposit;
+        // Build deposit state account
+        let deposit_state_account = &mut ctx.accounts.deposit;
 
-    //     // Query collateral token account for new balance
-    //     let collateral_amount =
-    //         token::accessor::amount(&ctx.accounts.destination_collateral.to_account_info())?;
-    //     // maybe run an error check for zero collateral token account balance
+        // Query collateral token account for new balance
+        let collateral_amount =
+            token::accessor::amount(&ctx.accounts.destination_collateral.to_account_info())?;
+        // maybe run an error check for zero collateral token account balance
 
-    //     deposit_state_account.user_authority = *ctx.accounts.user_authority.key;
-    //     deposit_state_account.collateral_account_key =
-    //         *ctx.accounts.destination_collateral.to_account_info().key;
-    //     deposit_state_account.liquidity_amount = liquidity_amount;
-    //     deposit_state_account.collateral_amount = collateral_amount;
-    //     deposit_state_account.schedule = schedule;
-    //     deposit_state_account.reserve_account = *ctx.accounts.reserve.key;
-    //     deposit_state_account.dca_mint = *ctx.accounts.dca_mint.to_account_info().key;
-    //     // dca_recipient should be the caller's ATA of the token they want to DCA into
-    //     deposit_state_account.dca_recipient = dca_recipient;
-    //     deposit_state_account.created_at = ctx.accounts.clock.unix_timestamp;
-    //     deposit_state_account.counter = 0;
-    //     deposit_state_account.nonce = nonce;
-    //     deposit_state_account.ooa = None;
+        deposit_state_account.user_authority = *ctx.accounts.user_authority.key;
+        deposit_state_account.collateral_account_key =
+            *ctx.accounts.destination_collateral.to_account_info().key;
+        deposit_state_account.liquidity_amount = liquidity_amount;
+        deposit_state_account.collateral_amount = collateral_amount;
+        deposit_state_account.schedule = schedule;
+        deposit_state_account.reserve_account = *ctx.accounts.reserve.key;
+        deposit_state_account.dca_mint = *ctx.accounts.dca_mint.to_account_info().key;
+        // dca_recipient should be the caller's ATA of the token they want to DCA into
+        deposit_state_account.dca_recipient = dca_recipient;
+        deposit_state_account.created_at = ctx.accounts.clock.unix_timestamp;
+        deposit_state_account.counter = 0;
+        deposit_state_account.nonce = nonce;
+        deposit_state_account.ooa = None;
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 
     /// Adds funds to an existing DepositState account. Requires user to supply the same
     /// destination_collateral_account (controlled by PDA)
