@@ -12,78 +12,80 @@ use anchor_spl::token::{self, Mint, TokenAccount};
 use spl_token_lending::state::Reserve;
 use std::num::NonZeroU64;
 
+declare_id!("BuYep31Y9ahB7qYPnTXY8zPVr4m341WPknmKj7RjGnaD");
+
 #[program]
 pub mod monaco {
     use super::*;
 
-    /// Deposits funds into solend reserve first, then makes corresponding DepositState account
-    pub fn deposit(
-        ctx: Context<Deposit>,
-        nonce: u8,
-        liquidity_amount: u64,
-        schedule: DcaSchedule,
-        dca_recipient: Pubkey,
-    ) -> ProgramResult {
-        // Make deposit into lending program
-        let cpi_accounts = DepositReserveLiquidity {
-            lending_program: ctx.accounts.lending_program.clone(),
-            source_liquidity: ctx.accounts.source_liquidity.to_account_info().clone(),
-            destination_collateral_account: ctx
-                .accounts
-                .destination_collateral
-                .to_account_info()
-                .clone(),
-            reserve_account: ctx.accounts.reserve.clone(),
-            reserve_collateral_mint: ctx.accounts.reserve_collateral_mint.clone(),
-            reserve_liquidity_supply: ctx.accounts.reserve_liquidity_supply.clone(),
-            lending_market_account: ctx.accounts.lending_market.clone(),
-            lending_market_authority: ctx.accounts.lending_market_authority.clone(),
-            transfer_authority: ctx.accounts.transfer_authority.clone(),
-            clock: ctx.accounts.clock.to_account_info().clone(),
-            token_program_id: ctx.accounts.token_program.clone(),
-        };
+    // /// Deposits funds into solend reserve first, then makes corresponding DepositState account
+    // pub fn deposit(
+    //     ctx: Context<Deposit>,
+    //     nonce: u8,
+    //     liquidity_amount: u64,
+    //     schedule: DcaSchedule,
+    //     dca_recipient: Pubkey,
+    // ) -> ProgramResult {
+    //     // Make deposit into lending program
+    //     let cpi_accounts = DepositReserveLiquidity {
+    //         lending_program: ctx.accounts.lending_program.clone(),
+    //         source_liquidity: ctx.accounts.source_liquidity.to_account_info().clone(),
+    //         destination_collateral_account: ctx
+    //             .accounts
+    //             .destination_collateral
+    //             .to_account_info()
+    //             .clone(),
+    //         reserve_account: ctx.accounts.reserve.clone(),
+    //         reserve_collateral_mint: ctx.accounts.reserve_collateral_mint.clone(),
+    //         reserve_liquidity_supply: ctx.accounts.reserve_liquidity_supply.clone(),
+    //         lending_market_account: ctx.accounts.lending_market.clone(),
+    //         lending_market_authority: ctx.accounts.lending_market_authority.clone(),
+    //         transfer_authority: ctx.accounts.transfer_authority.clone(),
+    //         clock: ctx.accounts.clock.to_account_info().clone(),
+    //         token_program_id: ctx.accounts.token_program.clone(),
+    //     };
 
-        let user_authority = ctx.accounts.user_authority.clone();
-        let reserve = ctx.accounts.reserve.clone();
+    //     let user_authority = ctx.accounts.user_authority.clone();
+    //     let reserve = ctx.accounts.reserve.clone();
 
-        let pda_seeds = &[
-            &user_authority.key.to_bytes()[..32],
-            &reserve.key.to_bytes()[..32],
-            &[nonce],
-        ];
-        let pda_signer = &[&pda_seeds[..]];
-        let cpi_ctx = CpiContext::new_with_signer(
-            ctx.accounts.lending_program.clone(),
-            cpi_accounts,
-            pda_signer,
-        );
-        deposit_reserve_liquidity(cpi_ctx, liquidity_amount)?;
+    //     let pda_seeds = &[
+    //         &user_authority.key.to_bytes()[..32],
+    //         &reserve.key.to_bytes()[..32],
+    //         &[nonce],
+    //     ];
+    //     let pda_signer = &[&pda_seeds[..]];
+    //     let cpi_ctx = CpiContext::new_with_signer(
+    //         ctx.accounts.lending_program.clone(),
+    //         cpi_accounts,
+    //         pda_signer,
+    //     );
+    //     deposit_reserve_liquidity(cpi_ctx, liquidity_amount)?;
 
-        // Build deposit state account
-        let deposit_state_account = &mut ctx.accounts.deposit;
+    //     // Build deposit state account
+    //     let deposit_state_account = &mut ctx.accounts.deposit;
 
-        // Query collateral token account for new balance
-        let collateral_amount =
-            token::accessor::amount(&ctx.accounts.destination_collateral.to_account_info())?;
-        // maybe run an error check for zero collateral token account balance
+    //     // Query collateral token account for new balance
+    //     let collateral_amount =
+    //         token::accessor::amount(&ctx.accounts.destination_collateral.to_account_info())?;
+    //     // maybe run an error check for zero collateral token account balance
 
-        deposit_state_account.user_authority = *ctx.accounts.user_authority.key;
-        deposit_state_account.collateral_account_key =
-            *ctx.accounts.destination_collateral.to_account_info().key;
-        deposit_state_account.liquidity_amount = liquidity_amount;
-        deposit_state_account.collateral_amount = collateral_amount;
-        deposit_state_account.schedule = schedule;
-        deposit_state_account.reserve_account = *ctx.accounts.reserve.key;
-        deposit_state_account.dca_mint = *ctx.accounts.dca_mint.to_account_info().key;
-        // dca_recipient should be the caller's ATA of the token they want to DCA into
-        deposit_state_account.dca_recipient = dca_recipient;
-        deposit_state_account.created_at = ctx.accounts.clock.unix_timestamp;
-        deposit_state_account.counter = 0;
-        deposit_state_account.nonce = nonce;
-        deposit_state_account.ooa = None;
+    //     deposit_state_account.user_authority = *ctx.accounts.user_authority.key;
+    //     deposit_state_account.collateral_account_key =
+    //         *ctx.accounts.destination_collateral.to_account_info().key;
+    //     deposit_state_account.liquidity_amount = liquidity_amount;
+    //     deposit_state_account.collateral_amount = collateral_amount;
+    //     deposit_state_account.schedule = schedule;
+    //     deposit_state_account.reserve_account = *ctx.accounts.reserve.key;
+    //     deposit_state_account.dca_mint = *ctx.accounts.dca_mint.to_account_info().key;
+    //     // dca_recipient should be the caller's ATA of the token they want to DCA into
+    //     deposit_state_account.dca_recipient = dca_recipient;
+    //     deposit_state_account.created_at = ctx.accounts.clock.unix_timestamp;
+    //     deposit_state_account.counter = 0;
+    //     deposit_state_account.nonce = nonce;
+    //     deposit_state_account.ooa = None;
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     /// Adds funds to an existing DepositState account. Requires user to supply the same
     /// destination_collateral_account (controlled by PDA)
@@ -315,11 +317,11 @@ pub mod monaco {
 }
 
 #[derive(Accounts)]
-#[instruction(nonce: u8, liquidity_amount: u64)]
+#[instruction(nonce: u8, liquidity_amount: u64, _bump: u8)]
 pub struct Deposit<'info> {
     // Deposit state account
-    #[account(init)]
-    pub deposit: ProgramAccount<'info, DepositState>,
+    #[account(init, payer = user_authority)]
+    pub deposit: Account<'info, DepositState>,
 
     // AccountInfo of the account that calls the ix
     #[account(signer)]
@@ -329,7 +331,7 @@ pub struct Deposit<'info> {
     pub lending_program: AccountInfo<'info>,
 
     // Token mint of DCA receiving asset
-    pub dca_mint: CpiAccount<'info, Mint>,
+    pub dca_mint: Account<'info, Mint>,
 
     // Solend CPI accounts
     // Token account for asset to deposit into reserve and make sure account owner is transfer authority PDA
@@ -337,14 +339,14 @@ pub struct Deposit<'info> {
         constraint = source_liquidity.amount >= liquidity_amount,
         constraint = source_liquidity.owner == *transfer_authority.key
     )]
-    pub source_liquidity: CpiAccount<'info, TokenAccount>,
+    pub source_liquidity: Account<'info, TokenAccount>,
     // Token account for reserve collateral token
     // Make sure it has a 0 balance to ensure empty account and make sure account owner is transfer authority PDA
     #[account(
         constraint = destination_collateral.amount == 0,
         constraint = destination_collateral.owner == *transfer_authority.key,
     )]
-    pub destination_collateral: CpiAccount<'info, TokenAccount>,
+    pub destination_collateral: Account<'info, TokenAccount>,
     // Reserve state account
     pub reserve: AccountInfo<'info>,
     // Token mint for reserve collateral token
@@ -356,8 +358,10 @@ pub struct Deposit<'info> {
     // Lending market authority (PDA)
     pub lending_market_authority: AccountInfo<'info>,
     // Transfer authority for source_liquidity and desitnation_collateral accounts
-    #[account(seeds = [&user_authority.key.to_bytes()[..32], &reserve.key.to_bytes()[..32], &[nonce]])]
+    #[account(seeds = [&user_authority.key.to_bytes()[..32], &reserve.key.to_bytes()[..32], &[nonce]], bump = _bump)]
     pub transfer_authority: AccountInfo<'info>,
+
+    pub system_program: Program<'info, System>,
     // Clock
     pub clock: Sysvar<'info, Clock>,
     // Token program
@@ -366,7 +370,7 @@ pub struct Deposit<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(nonce: u8, liquidity_amount: u64)]
+#[instruction(nonce: u8, liquidity_amount: u64, _bump: u8)]
 pub struct AddToDeposit<'info> {
     // Deposit state being modified
     // has_one ensures only the creator of the deposit_state account can add to it
@@ -386,7 +390,7 @@ pub struct AddToDeposit<'info> {
         constraint = source_liquidity.amount >= liquidity_amount,
         constraint = source_liquidity.owner == *transfer_authority.key
     )]
-    pub source_liquidity: CpiAccount<'info, TokenAccount>,
+    pub source_liquidity: Account<'info, TokenAccount>,
     // Token account for reserve collateral token
     // Make sure account owner is transfer authority PDA
     #[account(
@@ -395,7 +399,7 @@ pub struct AddToDeposit<'info> {
         // across all deposits to a deposit state account
         constraint = *destination_collateral.to_account_info().key == deposit_state.collateral_account_key
     )]
-    pub destination_collateral: CpiAccount<'info, TokenAccount>,
+    pub destination_collateral: Account<'info, TokenAccount>,
     // Reserve state account
     pub reserve: AccountInfo<'info>,
     // Token mint for reserve collateral token
@@ -407,7 +411,7 @@ pub struct AddToDeposit<'info> {
     // Lending market authority (PDA)
     pub lending_market_authority: AccountInfo<'info>,
     // Transfer authority for accounts 1 and 2
-    #[account(seeds = [&user_authority.key.to_bytes()[..32], &reserve.key.to_bytes()[..32], &[nonce]])]
+    #[account(seeds = [&user_authority.key.to_bytes()[..32], &reserve.key.to_bytes()[..32], &[nonce]], bump = _bump)]
     pub transfer_authority: AccountInfo<'info>,
     // Clock
     pub clock: Sysvar<'info, Clock>,
@@ -417,7 +421,7 @@ pub struct AddToDeposit<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(nonce: u8)]
+#[instruction(nonce: u8, _bump: u8)]
 pub struct RunDcaStrategy<'info> {
     // Deposite state account being modified
     #[account(mut)]
@@ -445,12 +449,12 @@ pub struct RunDcaStrategy<'info> {
     // RedeeemReserveCollateral accounts
     // Source token account for reserve collateral token
     #[account(constraint = source_collateral.to_account_info().key == transfer_authority.key)]
-    pub source_collateral: CpiAccount<'info, TokenAccount>,
+    pub source_collateral: Account<'info, TokenAccount>,
     #[account(
         mut,
         constraint = *serum_recipient.to_account_info().key == deposit_state.dca_recipient
     )]
-    pub serum_recipient: CpiAccount<'info, TokenAccount>,
+    pub serum_recipient: Account<'info, TokenAccount>,
     // Refreshed reserve account
     // #[account(constraint = refreshed_reserve.key == reserve.key)]
     pub refreshed_reserve: AccountInfo<'info>,
@@ -463,14 +467,14 @@ pub struct RunDcaStrategy<'info> {
     // Lending market authority - PDA
     pub lending_market_authority: AccountInfo<'info>,
     // User transfer authority
-    #[account(seeds = [&user_authority.key.to_bytes()[..32], &refreshed_reserve.key.to_bytes()[..32], &[nonce]])]
+    #[account(seeds = [&user_authority.key.to_bytes()[..32], &refreshed_reserve.key.to_bytes()[..32], &[nonce]], bump = _bump)]
     pub transfer_authority: AccountInfo<'info>,
 
     // Serum swap accounts
     market: MarketAccounts<'info>,
     // DELET DIS
     #[account(mut)]
-    dca_recipient: CpiAccount<'info, TokenAccount>,
+    dca_recipient: Account<'info, TokenAccount>,
     // Programs.
     dex_program: AccountInfo<'info>,
 
@@ -494,19 +498,19 @@ impl<'info> From<&RunDcaStrategy<'info>> for OrderbookClient<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(nonce: u8)]
+#[instruction(nonce: u8, _bump: u8)]
 pub struct CloseAccount<'info> {
     #[account(
         mut,
         close = user_authority,
         constraint = deposit_state.user_authority == *user_authority.key
     )]
-    pub deposit_state: ProgramAccount<'info, DepositState>,
+    pub deposit_state: Account<'info, DepositState>,
 
     #[account(signer)]
     pub user_authority: AccountInfo<'info>,
 
-    pub liquidity_recipient: CpiAccount<'info, TokenAccount>,
+    pub liquidity_recipient: Account<'info, TokenAccount>,
 
     // Solend, Jet, or Port program
     pub lending_program: AccountInfo<'info>,
@@ -514,12 +518,12 @@ pub struct CloseAccount<'info> {
     // RedeeemReserveCollateral accounts
     // Source token account for reserve collateral token
     #[account(constraint = source_collateral.to_account_info().key == transfer_authority.key)]
-    pub source_collateral: CpiAccount<'info, TokenAccount>,
+    pub source_collateral: Account<'info, TokenAccount>,
     #[account(
         mut,
         constraint = *serum_recipient.to_account_info().key == deposit_state.dca_recipient
     )]
-    pub serum_recipient: CpiAccount<'info, TokenAccount>,
+    pub serum_recipient: Account<'info, TokenAccount>,
     // Refreshed reserve account
     // #[account(constraint = refreshed_reserve.key == reserve.key)]
     pub refreshed_reserve: AccountInfo<'info>,
@@ -532,7 +536,7 @@ pub struct CloseAccount<'info> {
     // Lending market authority - PDA
     pub lending_market_authority: AccountInfo<'info>,
     // User transfer authority
-    #[account(seeds = [&user_authority.key.to_bytes()[..32], &refreshed_reserve.key.to_bytes()[..32], &[nonce]])]
+    #[account(seeds = [&user_authority.key.to_bytes()[..32], &refreshed_reserve.key.to_bytes()[..32], &[nonce]], bump = _bump)]
     pub transfer_authority: AccountInfo<'info>,
 
     pub clock: AccountInfo<'info>,
@@ -541,6 +545,7 @@ pub struct CloseAccount<'info> {
 }
 
 #[account]
+#[derive(Default)]
 pub struct DepositState {
     // Pubkey of depositor that called ix
     pub user_authority: Pubkey,
@@ -607,7 +612,7 @@ pub struct MarketAccounts<'info> {
     vault_signer: AccountInfo<'info>,
     // User wallets.
     #[account(mut)]
-    destination_liquidity: CpiAccount<'info, TokenAccount>,
+    destination_liquidity: Account<'info, TokenAccount>,
 }
 
 // Client for sending orders to the Serum DEX.
@@ -718,7 +723,7 @@ impl<'info> OrderbookClient<'info> {
     fn settle(
         &self,
         referral: Option<AccountInfo<'info>>,
-        quote_wallet: &CpiAccount<'info, TokenAccount>,
+        quote_wallet: &Account<'info, TokenAccount>,
     ) -> ProgramResult {
         let settle_accs = dex::SettleFunds {
             market: self.market.market.clone(),
@@ -767,7 +772,7 @@ fn validate_admin(ctx: &Context<RunDcaStrategy>) -> ProgramResult {
     Ok(())
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub enum DcaSchedule {
     Daily,
     Weekly,
