@@ -781,6 +781,12 @@ pub enum DcaSchedule {
     Quarterly,
 }
 
+impl Default for DcaSchedule {
+    fn default() -> Self {
+        DcaSchedule::Weekly
+    }
+}
+
 // Returns the amount of lots for the base currency of a trade with `size`.
 fn coin_lots(market: &MarketState, size: u64) -> u64 {
     size.checked_div(market.coin_lot_size).unwrap()
