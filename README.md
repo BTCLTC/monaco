@@ -25,11 +25,11 @@ No. As of the time I'm writing this, I have only finished the initial smart cont
 
 ## Will this be supported after the hackathon is over?
 
-Yes, v1 will simply be DCA via lending protocols and Serum. v2 will be off-the-walls crazy.
+Yes, it will be supported and taken care of long after as well but I doubt I'll be adding in more features. Probably just maintaining the ones I'm building out right now
 
 ## Will there be a token?
 
-Honestly idk. I don't want to shove in a token unless there is a really good reason to. Right now, token incentives seem somewhat parasitic to me (just an opinion) but maybe I'll change my mind on this later, I really have no idea. Please DM me if you have thoughts on this and wanna talk about it
+No. I don't want to shove in a token unless there is a really good reason to and I don't think there is one.
 
 ## Is there a sneak preview of the UI?
 
